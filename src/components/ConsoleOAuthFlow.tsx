@@ -17,6 +17,7 @@ import { getSettings_DEPRECATED, updateSettingsForSource } from '../utils/settin
 import { Select } from './CustomSelect/select.js';
 import { Spinner } from './Spinner.js';
 import TextInput from './TextInput.js';
+import { checkOllamaStatus, listOllamaModels, pullOllamaModel, pingUrl } from '../utils/localLlm.js';
 
 type Props = {
   onDone(): void;
@@ -55,8 +56,25 @@ type OAuthStatus =
       opusModel: string;
       activeField: 'base_url' | 'api_key' | 'haiku_model' | 'sonnet_model' | 'opus_model';
     } // Gemini Generate Content API platform
+  | {
+      state: 'local_llm_setup';
+      runnerType: 'ollama' | 'lmstudio' | 'jan' | 'localai' | 'custom';
+      baseUrl: string;
+      apiKey?: string;
+      modelName: string;
+      activeField: 'runner_type' | 'base_url' | 'api_key' | 'model_name' | 'custom_model_name';
+      availableModels: string[];
+      isLoadingModels: boolean;
+      statusMessage?: string;
+    }
+  | {
+      state: 'local_llm_pulling';
+      modelName: string;
+      status: string;
+      percentage?: number;
+    }
   | { state: 'ready_to_start' } // Flow started, waiting for browser to open
-  | { state: 'waiting_for_login'; url: string } // Browser opened, waiting for user to login
+  | { state: 'waiting_for_login'; url?: string } // Browser opened, waiting for user to login
   | { state: 'creating_api_key' } // Got access token, creating API key
   | { state: 'about_to_retry'; nextState: OAuthStatus }
   | { state: 'success'; token?: string }
@@ -67,6 +85,7 @@ type OAuthStatus =
     };
 
 const PASTE_HERE_MSG = 'Paste code here if prompted > ';
+const POPULAR_MODELS = ['llama3.1', 'mistral', 'phi3', 'qwen2', 'gemma2', 'codellama'];
 export function ConsoleOAuthFlow({
   onDone,
   startingMessage,
@@ -127,6 +146,94 @@ export function ConsoleOAuthFlow({
     }
   }, [oauthStatus]);
 
+  // Handle Ollama model listing
+  useEffect(() => {
+    if (
+      oauthStatus.state === 'local_llm_setup' &&
+      oauthStatus.runnerType === 'ollama' &&
+      oauthStatus.availableModels.length === 0 &&
+      !oauthStatus.isLoadingModels
+    ) {
+      setOAuthStatus(prev => (prev.state === 'local_llm_setup' ? { ...prev, isLoadingModels: true } : prev));
+      listOllamaModels(oauthStatus.baseUrl)
+        .then(models => {
+          setOAuthStatus(prev =>
+            prev.state === 'local_llm_setup'
+              ? {
+                  ...prev,
+                  availableModels: models,
+                  isLoadingModels: false,
+                  statusMessage: models.length === 0 ? 'No models found. You can download one below.' : undefined,
+                }
+              : prev,
+          );
+        })
+        .catch(err => {
+          setOAuthStatus(prev =>
+            prev.state === 'local_llm_setup'
+              ? {
+                  ...prev,
+                  isLoadingModels: false,
+                  statusMessage: `Error: ${err.message}`,
+                }
+              : prev,
+          );
+        });
+    }
+  }, [oauthStatus]);
+
+  // Handle Ollama model pulling
+  useEffect(() => {
+    if (oauthStatus.state === 'local_llm_pulling') {
+      const abortController = new AbortController();
+      (async () => {
+        try {
+          for await (const progress of pullOllamaModel(
+            oauthStatus.modelName,
+            'http://localhost:11434',
+            abortController.signal,
+          )) {
+            setOAuthStatus(prev =>
+              prev.state === 'local_llm_pulling'
+                ? {
+                    ...prev,
+                    status: progress.status,
+                    percentage: progress.percentage,
+                  }
+                : prev,
+            );
+          }
+          // Success! Reload models
+          setOAuthStatus({
+            state: 'local_llm_setup',
+            runnerType: 'ollama',
+            baseUrl: 'http://localhost:11434',
+            modelName: oauthStatus.modelName,
+            activeField: 'model_name',
+            availableModels: [],
+            isLoadingModels: false,
+          });
+        } catch (err) {
+          if (abortController.signal.aborted) return;
+          setOAuthStatus({
+            state: 'error',
+            message: `Failed to pull model: ${err instanceof Error ? err.message : String(err)}`,
+            toRetry: {
+              state: 'local_llm_setup',
+              runnerType: 'ollama',
+              baseUrl: 'http://localhost:11434',
+              modelName: oauthStatus.modelName,
+              activeField: 'model_name',
+              availableModels: [],
+              isLoadingModels: false,
+            },
+          });
+        }
+      })();
+      return () => abortController.abort();
+    }
+  }, [oauthStatus.state]);
+
   // Handle Enter to continue on success state
   useKeybinding(
     'confirm:yes',
@@ -172,7 +279,7 @@ export function ConsoleOAuthFlow({
 
   useEffect(() => {
     if (pastedCode === 'c' && oauthStatus.state === 'waiting_for_login' && showPastePrompt && !urlCopied) {
-      void setClipboard(oauthStatus.url).then(raw => {
+      void setClipboard(oauthStatus.url || '').then(raw => {
         if (raw) process.stdout.write(raw);
         setUrlCopied(true);
         setTimeout(setUrlCopied, 2000, false);
@@ -341,7 +448,7 @@ export function ConsoleOAuthFlow({
               </Text>
             )}
           </Box>
-          <Link url={oauthStatus.url}>
+          <Link url={oauthStatus.url || ''}>
             <Text dimColor>{oauthStatus.url}</Text>
           </Link>
         </Box>
@@ -430,6 +537,15 @@ function OAuthStatusMessage({
                 {
                   label: (
                     <Text>
+                      Local LLM · <Text dimColor>Ollama, LM Studio, Jan.ai, LocalAI</Text>
+                      {'\n'}
+                    </Text>
+                  ),
+                  value: 'local_llm',
+                },
+                {
+                  label: (
+                    <Text>
                       Anthropic Compatible · <Text dimColor>Configure your own API endpoint</Text>
                       {'\n'}
                     </Text>
@@ -493,6 +609,19 @@ function OAuthStatusMessage({
                 },
               ]}
               onChange={value => {
+                if (value === 'local_llm') {
+                  logEvent('tengu_local_llm_selected', {});
+                  setOAuthStatus({
+                    state: 'local_llm_setup',
+                    runnerType: 'ollama',
+                    baseUrl: 'http://localhost:11434',
+                    modelName: '',
+                    activeField: 'runner_type',
+                    availableModels: [],
+                    isLoadingModels: false,
+                  });
+                  return;
+                }
                 if (value === 'custom_platform') {
                   logEvent('tengu_custom_platform_selected', {});
                   setOAuthStatus({
@@ -544,6 +673,329 @@ function OAuthStatusMessage({
           </Box>
         </Box>
       );
+
+    case 'local_llm_setup': {
+      type LocalField = 'runner_type' | 'base_url' | 'api_key' | 'model_name' | 'custom_model_name';
+      const LOCAL_FIELDS: LocalField[] = ['runner_type', 'base_url', 'api_key', 'model_name', 'custom_model_name'];
+      const activeField = oauthStatus.activeField;
+
+      const displayValues: Record<LocalField, string> = {
+        runner_type: oauthStatus.runnerType,
+        base_url: oauthStatus.baseUrl,
+        api_key: (oauthStatus as any).apiKey ?? '',
+        model_name: oauthStatus.modelName,
+        custom_model_name: oauthStatus.modelName,
+      };
+
+      const [localInputValue, setLocalInputValue] = useState(displayValues[activeField] ?? '');
+      const [localInputCursorOffset, setLocalInputCursorOffset] = useState((displayValues[activeField] ?? '').length);
+
+      const buildLocalState = useCallback(
+        (field: LocalField, val: string, nextField?: LocalField): OAuthStatus => {
+          const newState = { ...oauthStatus } as any;
+          if (field === 'runner_type') {
+            newState.runnerType = val;
+            if (val === 'ollama') newState.baseUrl = 'http://localhost:11434';
+            else if (val === 'lmstudio') newState.baseUrl = 'http://localhost:1234/v1';
+            else if (val === 'jan') newState.baseUrl = 'http://localhost:1337/v1';
+            else if (val === 'localai') newState.baseUrl = 'http://localhost:8080/v1';
+          } else if (field === 'base_url') {
+            newState.baseUrl = val;
+          } else if (field === 'api_key') {
+            newState.apiKey = val;
+          } else if (field === 'model_name' || field === 'custom_model_name') {
+            newState.modelName = val;
+          }
+          if (nextField) newState.activeField = nextField;
+          return newState;
+        },
+        [oauthStatus],
+      );
+
+      const doLocalSave = useCallback(
+        async (stateToSave: any) => {
+          const { runnerType, baseUrl, modelName, apiKey } = stateToSave;
+          const env: Record<string, string> = {
+            LOCAL_BASE_URL: baseUrl,
+            LOCAL_MODEL: modelName || 'llama3.1',
+            LOCAL_RUNNER_TYPE: runnerType,
+          };
+          if (apiKey) env.LOCAL_API_KEY = apiKey;
+
+          updateSettingsForSource('userSettings', {
+            modelType: 'local',
+            env,
+          } as any);
+
+          updateSettingsForSource('userSettings', {
+            model: modelName || 'llama3.1',
+          } as any);
+
+          setOAuthStatus({ state: 'success' });
+          void onDone();
+        },
+        [onDone, setOAuthStatus],
+      );
+
+      const handleLocalEnter = useCallback(() => {
+        if (activeField === 'custom_model_name' && localInputValue) {
+          if (oauthStatus.runnerType === 'ollama' && !oauthStatus.availableModels.includes(localInputValue)) {
+            setOAuthStatus({
+              state: 'local_llm_pulling',
+              modelName: localInputValue,
+              status: 'Starting download...',
+            });
+            return;
+          }
+          const nextState = buildLocalState(activeField, localInputValue);
+          setOAuthStatus(nextState);
+          doLocalSave(nextState);
+          return;
+        }
+
+        const idx = LOCAL_FIELDS.indexOf(activeField);
+        if (idx === LOCAL_FIELDS.length - 1 || activeField === 'model_name') {
+          const nextState = buildLocalState(activeField, localInputValue);
+          setOAuthStatus(nextState);
+          doLocalSave(nextState);
+        } else {
+          // find next interactive field (skip model_name if custom_model_name is next, but that's handled by onChange)
+          const next = LOCAL_FIELDS[idx + 1]!;
+          const nextState = buildLocalState(activeField, localInputValue, next) as any;
+          setOAuthStatus(nextState);
+          const nextVal =
+            nextState[
+              next === 'runner_type'
+                ? 'runnerType'
+                : next === 'base_url'
+                  ? 'baseUrl'
+                  : next === 'api_key'
+                    ? 'apiKey'
+                    : 'modelName'
+            ];
+          setLocalInputValue(nextVal ?? '');
+          setLocalInputCursorOffset((nextVal ?? '').length);
+        }
+      }, [activeField, localInputValue, oauthStatus, buildLocalState, doLocalSave, setOAuthStatus]);
+
+      useKeybinding(
+        'tabs:next',
+        () => {
+          if (activeField === 'runner_type' || activeField === 'model_name') return; // Handled by Select component natively
+          const idx = LOCAL_FIELDS.indexOf(activeField);
+          if (idx < LOCAL_FIELDS.length - 1) {
+            const next = LOCAL_FIELDS[idx + 1]!;
+            const nextState = buildLocalState(activeField, localInputValue, next) as any;
+            setOAuthStatus(nextState);
+            const nextVal =
+              nextState[
+                next === 'runner_type'
+                  ? 'runnerType'
+                  : next === 'base_url'
+                    ? 'baseUrl'
+                    : next === 'api_key'
+                      ? 'apiKey'
+                      : 'modelName'
+              ];
+            setLocalInputValue(nextVal ?? '');
+            setLocalInputCursorOffset((nextVal ?? '').length);
+          }
+        },
+        { context: 'FormField' },
+      );
+
+      useKeybinding(
+        'tabs:previous',
+        () => {
+          if (activeField === 'runner_type' || activeField === 'model_name') return; // Select components trap up/down
+          const idx = LOCAL_FIELDS.indexOf(activeField);
+          if (idx > 0) {
+            const next = LOCAL_FIELDS[idx - 1]!;
+            const nextState = buildLocalState(activeField, localInputValue, next) as any;
+            setOAuthStatus(nextState);
+            const nextVal =
+              nextState[
+                next === 'runner_type'
+                  ? 'runnerType'
+                  : next === 'base_url'
+                    ? 'baseUrl'
+                    : next === 'api_key'
+                      ? 'apiKey'
+                      : 'modelName'
+              ];
+            setLocalInputValue(nextVal ?? '');
+            setLocalInputCursorOffset((nextVal ?? '').length);
+          }
+        },
+        { context: 'FormField' },
+      );
+
+      useKeybinding(
+        'confirm:no',
+        () => {
+          setOAuthStatus({ state: 'idle' });
+        },
+        { context: 'Confirmation' },
+      );
+
+      const localColumns = useTerminalSize().columns - 20;
+
+      const renderLocalTextInput = (field: LocalField, label: string, mask?: boolean) => {
+        const active = activeField === field;
+        const val = displayValues[field];
+        return (
+          <Box>
+            <Text backgroundColor={active ? 'suggestion' : undefined} color={active ? 'inverseText' : undefined}>
+              {` ${label} `}
+            </Text>
+            <Text> </Text>
+            {active ? (
+              <TextInput
+                value={localInputValue}
+                onChange={setLocalInputValue}
+                onSubmit={handleLocalEnter}
+                cursorOffset={localInputCursorOffset}
+                onChangeCursorOffset={setLocalInputCursorOffset}
+                columns={localColumns}
+                mask={mask ? '*' : undefined}
+                focus={true}
+              />
+            ) : val ? (
+              <Text color="success">{mask ? val.slice(0, 8) + '\u00b7'.repeat(Math.max(0, val.length - 8)) : val}</Text>
+            ) : null}
+          </Box>
+        );
+      };
+
+      const runnerTypeOptions = [
+        { label: 'Ollama', value: 'ollama' },
+        { label: 'LM Studio', value: 'lmstudio' },
+        { label: 'Jan.ai', value: 'jan' },
+        { label: 'LocalAI', value: 'localai' },
+        { label: 'Custom', value: 'custom' },
+      ];
+
+      return (
+        <Box flexDirection="column" gap={1}>
+          <Text bold>Local LLM Setup</Text>
+          <Text dimColor>Configure a local LLM runner. Ollama is recommended.</Text>
+
+          <Box flexDirection="column" gap={1}>
+            <Box>
+              <Text
+                backgroundColor={activeField === 'runner_type' ? 'suggestion' : undefined}
+                color={activeField === 'runner_type' ? 'inverseText' : undefined}
+              >
+                {' Runner Type '}
+              </Text>
+              <Text> </Text>
+              {activeField === 'runner_type' ? (
+                <Select
+                  options={runnerTypeOptions}
+                  onChange={val => {
+                    const nextState = buildLocalState('runner_type', val, 'base_url') as any;
+                    setOAuthStatus(nextState);
+                    setLocalInputValue(nextState.baseUrl ?? '');
+                    setLocalInputCursorOffset((nextState.baseUrl ?? '').length);
+                  }}
+                />
+              ) : (
+                <Text color="success">{displayValues.runner_type}</Text>
+              )}
+            </Box>
+
+            {(activeField === 'base_url' || LOCAL_FIELDS.indexOf(activeField) > LOCAL_FIELDS.indexOf('base_url')) &&
+              renderLocalTextInput('base_url', 'Base URL   ')}
+
+            {(activeField === 'api_key' || LOCAL_FIELDS.indexOf(activeField) > LOCAL_FIELDS.indexOf('api_key')) &&
+              renderLocalTextInput('api_key', 'API Key    ', true)}
+
+            {(activeField === 'model_name' || activeField === 'custom_model_name') && (
+              <Box flexDirection="column">
+                <Box>
+                  <Text
+                    backgroundColor={activeField === 'model_name' ? 'suggestion' : undefined}
+                    color={activeField === 'model_name' ? 'inverseText' : undefined}
+                  >
+                    {' Model Name '}
+                  </Text>
+                  <Text> </Text>
+                  {activeField === 'model_name' ? (
+                    oauthStatus.isLoadingModels ? (
+                      <Box gap={1}>
+                        <Spinner />
+                        <Text>Loading installed models...</Text>
+                      </Box>
+                    ) : (
+                      <Box flexDirection="column">
+                        <Select
+                          options={[
+                            ...oauthStatus.availableModels.map(m => ({ label: m, value: m })),
+                            ...POPULAR_MODELS.filter(m => !oauthStatus.availableModels.includes(m)).map(m => ({
+                              label: `${m} (Download)`,
+                              value: m,
+                            })),
+                            { label: 'Custom (Type your own)', value: '__custom__' },
+                          ]}
+                          onChange={val => {
+                            if (val === '__custom__') {
+                              const nextState = buildLocalState('model_name', '', 'custom_model_name') as any;
+                              setOAuthStatus(nextState);
+                              setLocalInputValue('');
+                              setLocalInputCursorOffset(0);
+                            } else {
+                              const nextState = buildLocalState('model_name', val);
+                              if (oauthStatus.runnerType === 'ollama' && !oauthStatus.availableModels.includes(val)) {
+                                setOAuthStatus({
+                                  state: 'local_llm_pulling',
+                                  modelName: val,
+                                  status: 'Starting download...',
+                                });
+                              } else {
+                                setOAuthStatus(nextState);
+                                doLocalSave(nextState);
+                              }
+                            }
+                          }}
+                        />
+                      </Box>
+                    )
+                  ) : activeField === 'custom_model_name' ? (
+                    <TextInput
+                      value={localInputValue}
+                      onChange={setLocalInputValue}
+                      onSubmit={handleLocalEnter}
+                      cursorOffset={localInputCursorOffset}
+                      onChangeCursorOffset={setLocalInputCursorOffset}
+                      columns={localColumns}
+                      focus={true}
+                    />
+                  ) : (
+                    <Text color="success">{displayValues.model_name}</Text>
+                  )}
+                </Box>
+              </Box>
+            )}
+          </Box>
+
+          <Text dimColor>↑↓ to select options · Enter to save · Esc to go back</Text>
+        </Box>
+      );
+    }
+
+    case 'local_llm_pulling': {
+      return (
+        <Box flexDirection="column" gap={1} marginTop={1}>
+          <Text bold>Downloading {oauthStatus.modelName}...</Text>
+          <Box gap={1}>
+            <Spinner />
+            <Text>{oauthStatus.status}</Text>
+            {oauthStatus.percentage !== undefined && <Text color="success">{oauthStatus.percentage}%</Text>}
+          </Box>
+          <Text dimColor>Please wait, this may take a few minutes depending on your internet speed.</Text>
+        </Box>
+      );
+    }
 
     case 'custom_platform': {
       type Field = 'base_url' | 'api_key' | 'haiku_model' | 'sonnet_model' | 'opus_model';
@@ -1006,7 +1458,7 @@ function OAuthStatusMessage({
         [activeField, baseUrl, apiKey, haikuModel, sonnetModel, opusModel],
       );
 
-      const doGeminiSave = useCallback(() => {
+      const doGeminiSave = useCallback(async () => {
         const finalVals = { ...geminiDisplayValues, [activeField]: geminiInputValue };
         if (!finalVals.haiku_model || !finalVals.sonnet_model || !finalVals.opus_model) {
           setOAuthStatus({
@@ -1023,6 +1475,29 @@ function OAuthStatusMessage({
             },
           });
           return;
+        }
+
+        if (!finalVals.api_key) {
+          setOAuthStatus({ state: 'waiting_for_login' });
+          try {
+            const { loginToGoogle } = await import('src/services/api/gemini/google-oauth.js');
+            await loginToGoogle();
+          } catch (e) {
+            setOAuthStatus({
+              state: 'error',
+              message: `Google Login failed: ${e instanceof Error ? e.message : e}`,
+              toRetry: {
+                state: 'gemini_api',
+                baseUrl: finalVals.base_url,
+                apiKey: finalVals.api_key,
+                haikuModel: finalVals.haiku_model,
+                sonnetModel: finalVals.sonnet_model,
+                opusModel: finalVals.opus_model,
+                activeField: 'api_key',
+              },
+            });
+            return;
+          }
         }
 
         const env: Record<string, string> = {};
@@ -1137,7 +1612,7 @@ function OAuthStatusMessage({
           <Text bold>Gemini API Setup</Text>
           <Text dimColor>
             Configure a Gemini Generate Content compatible endpoint. Base URL is optional and defaults to Google&apos;s
-            v1beta API.
+            v1beta API. Leave API Key blank to log in via browser (Google Auth).
           </Text>
           <Box flexDirection="column" gap={1}>
             {renderGeminiRow('base_url', 'Base URL ')}
@@ -1219,7 +1694,7 @@ function OAuthStatusMessage({
               <TextInput
                 value={pastedCode}
                 onChange={setPastedCode}
-                onSubmit={(value: string) => handleSubmitCode(value, oauthStatus.url)}
+                onSubmit={(value: string) => handleSubmitCode(value, oauthStatus.url || '')}
                 cursorOffset={cursorOffset}
                 onChangeCursorOffset={setCursorOffset}
                 columns={textInputColumns}

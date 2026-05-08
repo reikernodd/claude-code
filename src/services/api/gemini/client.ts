@@ -1,6 +1,7 @@
 import { parseSSEFrames } from 'src/cli/transports/SSETransport.js'
 import { errorMessage } from 'src/utils/errors.js'
 import { getProxyFetchOptions } from 'src/utils/proxy.js'
+import { getGoogleAccessToken } from './google-oauth.js'
 import type {
   GeminiGenerateContentRequest,
   GeminiStreamChunk,
@@ -32,12 +33,22 @@ export async function* streamGeminiGenerateContent(params: {
   const fetchImpl = params.fetchOverride ?? fetch
   const url = `${getGeminiBaseUrl()}/${getGeminiModelPath(params.model)}:streamGenerateContent?alt=sse`
 
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  }
+
+  if (process.env.GEMINI_API_KEY) {
+    headers['x-goog-api-key'] = process.env.GEMINI_API_KEY
+  } else {
+    const token = await getGoogleAccessToken()
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`
+    }
+  }
+
   const response = await fetchImpl(url, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-goog-api-key': process.env.GEMINI_API_KEY || '',
-    },
+    headers,
     body: JSON.stringify(params.body),
     signal: params.signal,
     ...getProxyFetchOptions({ forAnthropicAPI: false }),

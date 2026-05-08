@@ -25,7 +25,9 @@ const MODEL_KEYS = Object.keys(ALL_MODEL_CONFIGS) as ModelKey[]
 function getBuiltinModelStrings(provider: APIProvider): ModelStrings {
   const out = {} as ModelStrings
   for (const key of MODEL_KEYS) {
-    out[key] = ALL_MODEL_CONFIGS[key][provider]
+    out[key] =
+      (ALL_MODEL_CONFIGS[key] as any)[provider] ||
+      ALL_MODEL_CONFIGS[key].firstParty
   }
   return out
 }

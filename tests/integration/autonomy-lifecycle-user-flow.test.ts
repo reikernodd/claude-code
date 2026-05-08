@@ -14,6 +14,7 @@ import {
 import { listAutonomyFlows } from '../../src/utils/autonomyFlows'
 
 const CLI_ENTRYPOINT = resolve(import.meta.dir, '../../src/entrypoints/cli.tsx')
+const PROJECT_ROOT = resolve(import.meta.dir, '../../')
 
 let tempDir = ''
 let configDir = ''
@@ -22,10 +23,11 @@ let previousConfigDir: string | undefined
 async function runAutonomyCli(args: string[]): Promise<string> {
   const proc = Bun.spawn({
     cmd: [process.execPath, CLI_ENTRYPOINT, 'autonomy', ...args],
-    cwd: tempDir,
+    cwd: PROJECT_ROOT,
     env: {
       ...process.env,
       CLAUDE_CONFIG_DIR: configDir,
+      CLAUDE_CODE_CWD: tempDir,
       CI: 'true',
       GITHUB_ACTIONS: 'true',
       NODE_ENV: 'development',

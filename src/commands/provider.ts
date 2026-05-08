@@ -67,6 +67,7 @@ const call: LocalCommandCall = async (args, _context) => {
     'openai',
     'gemini',
     'grok',
+    'local',
     'bedrock',
     'vertex',
     'foundry',
@@ -75,6 +76,19 @@ const call: LocalCommandCall = async (args, _context) => {
     return {
       type: 'text',
       value: `Invalid provider: ${arg}\nValid: ${validProviders.join(', ')}`,
+    }
+  }
+
+  // Check env vars when switching to local (including settings.env)
+  if (arg === 'local') {
+    const mergedEnv = getMergedEnv()
+    const hasUrl = !!mergedEnv.LOCAL_BASE_URL
+    if (!hasUrl) {
+      updateSettingsForSource('userSettings', { modelType: 'local' })
+      return {
+        type: 'text',
+        value: `Switched to Local provider.\nWarning: Missing env var: LOCAL_BASE_URL\nConfigure it via /login or set manually.`,
+      }
     }
   }
 
@@ -129,7 +143,8 @@ const call: LocalCommandCall = async (args, _context) => {
     arg === 'anthropic' ||
     arg === 'openai' ||
     arg === 'gemini' ||
-    arg === 'grok'
+    arg === 'grok' ||
+    arg === 'local'
   ) {
     // Clear any cloud provider env vars to avoid conflicts
     delete process.env.CLAUDE_CODE_USE_BEDROCK
