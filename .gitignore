@@ -12,10 +12,10 @@ coverage
 src/utils/vendor/
 
 # AI tool runtime directories
-.agents/
-.claude/
-.omx/
-.docs/task/
+.agents/*
+.claude/*
+.omx/*
+.docs/task/*
 # Binary / screenshot files (root only)
 /*.png
 *.bmp
@@ -47,4 +47,3 @@ data
 teach-me
 credentials.json
 OAuth.json
-.claude/agents/hello-agent.md
