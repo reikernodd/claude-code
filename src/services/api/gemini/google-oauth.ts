@@ -5,10 +5,31 @@ import { updateSettingsForSource } from 'src/utils/settings/settings.js'
 import { getInitialSettings as getSettings } from 'src/utils/settings/settings.js'
 import { logEvent } from 'src/services/analytics/index.js'
 import * as crypto from 'crypto' // For state generation if needed
+import * as fs from 'fs'
+import * as path from 'path'
 
-const GOOGLE_CLIENT_ID = '32555940559.apps.googleusercontent.com'
-const GOOGLE_CLIENT_SECRET = 'ZmssLNjJy2998hD4CTg2ejr2'
-const SCOPES = ['https://www.googleapis.com/auth/cloud-platform']
+let GOOGLE_CLIENT_ID = ''
+let GOOGLE_CLIENT_SECRET = ''
+
+try {
+  const oauthPath = path.join(process.cwd(), '.files', 'OAuth.json')
+  if (fs.existsSync(oauthPath)) {
+    const data = JSON.parse(fs.readFileSync(oauthPath, 'utf8'))
+    const config = data.web || data.installed
+    if (config && config.client_id && config.client_secret) {
+      GOOGLE_CLIENT_ID = config.client_id
+      GOOGLE_CLIENT_SECRET = config.client_secret
+    }
+  }
+} catch (e) {
+  // Ignore errors reading OAuth.json
+}
+const SCOPES = [
+  'https://www.googleapis.com/auth/generative-language.retriever',
+  'https://www.googleapis.com/auth/cloud-platform',
+  'https://www.googleapis.com/auth/userinfo.email',
+  'https://www.googleapis.com/auth/userinfo.profile',
+]
 
 export async function loginToGoogle(): Promise<void> {
   const listener = new AuthCodeListener('/')
@@ -50,9 +71,24 @@ export async function loginToGoogle(): Promise<void> {
       res.writeHead(200, { 'Content-Type': 'text/html' })
       res.end(`
         <html>
+          <head>
+            <title>Authentication successful</title>
+            <style>
+              body { font-family: sans-serif; padding: 2rem; }
+              h1 { color: #1a73e8; }
+              ul { line-height: 1.6; }
+            </style>
+          </head>
           <body>
-            <h1>Successfully logged in to Google!</h1>
-            <p>You can close this tab and return to Claude Code.</p>
+            <h1>Authentication successful</h1>
+            <p>The authentication was successful, and the following products are now authorized to access your account:</p>
+            <ul>
+              <li>Gemini Code Assist</li>
+              <li>Cloud Code with Gemini Code Assist</li>
+              <li>Gemini CLI</li>
+              <li>Antigravity (available only for free, Google One AI Pro, Google One AI Ultra, and Google Workspace AI Ultra for Business)</li>
+            </ul>
+            <p>You can close this window and return to your IDE or terminal.</p>
             <script>window.close();</script>
           </body>
         </html>

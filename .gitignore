@@ -46,3 +46,5 @@ data
 !.codex/prompts/**
 teach-me
 credentials.json
+OAuth.json
+.claude/agents/hello-agent.md

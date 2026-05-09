@@ -13,15 +13,48 @@ const DEFAULT_GEMINI_BASE_URL =
 const STREAM_DECODE_OPTS: TextDecodeOptions = { stream: true }
 
 function getGeminiBaseUrl(): string {
-  return (process.env.GEMINI_BASE_URL || DEFAULT_GEMINI_BASE_URL).replace(
-    /\/+$/,
-    '',
-  )
+  return DEFAULT_GEMINI_BASE_URL.replace(/\/+$/, '')
 }
 
 function getGeminiModelPath(model: string): string {
   const normalized = model.replace(/^\/+/, '')
   return normalized.startsWith('models/') ? normalized : `models/${normalized}`
+}
+
+export async function listGeminiModels(apiKey?: string): Promise<string[]> {
+  const url = `${getGeminiBaseUrl()}/models`
+  const headers: Record<string, string> = {}
+
+  if (apiKey) {
+    headers['x-goog-api-key'] = apiKey
+  } else {
+    const token = await getGoogleAccessToken()
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`
+    } else {
+      throw new Error('No API key or Google Auth token available')
+    }
+  }
+
+  const response = await fetch(url, {
+    method: 'GET',
+    headers,
+    ...getProxyFetchOptions({ forAnthropicAPI: false }),
+  })
+
+  if (!response.ok) {
+    const body = await response.text()
+    throw new Error(
+      `Failed to fetch Gemini models (${response.status} ${response.statusText}): ${body || 'empty response body'}`,
+    )
+  }
+
+  const data = await response.json()
+  if (!data || !Array.isArray(data.models)) {
+    return []
+  }
+
+  return data.models.map((m: any) => m.name.replace(/^models\//, ''))
 }
 
 export async function* streamGeminiGenerateContent(params: {

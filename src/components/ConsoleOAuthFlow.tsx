@@ -49,12 +49,21 @@ type OAuthStatus =
     } // OpenAI Chat Completions API platform
   | {
       state: 'gemini_api';
-      baseUrl: string;
       apiKey: string;
       haikuModel: string;
       sonnetModel: string;
       opusModel: string;
-      activeField: 'base_url' | 'api_key' | 'haiku_model' | 'sonnet_model' | 'opus_model';
+      activeField:
+        | 'api_key'
+        | 'haiku_model'
+        | 'sonnet_model'
+        | 'opus_model'
+        | 'custom_haiku_model'
+        | 'custom_sonnet_model'
+        | 'custom_opus_model';
+      availableModels: string[];
+      isLoadingModels: boolean;
+      statusMessage?: string;
     } // Gemini Generate Content API platform
   | {
       state: 'local_llm_setup';
@@ -152,7 +161,8 @@ export function ConsoleOAuthFlow({
       oauthStatus.state === 'local_llm_setup' &&
       oauthStatus.runnerType === 'ollama' &&
       oauthStatus.availableModels.length === 0 &&
-      !oauthStatus.isLoadingModels
+      !oauthStatus.isLoadingModels &&
+      !oauthStatus.statusMessage
     ) {
       setOAuthStatus(prev => (prev.state === 'local_llm_setup' ? { ...prev, isLoadingModels: true } : prev));
       listOllamaModels(oauthStatus.baseUrl)
@@ -499,7 +509,7 @@ type OAuthStatusMessageProps = {
   setCursorOffset: (offset: number) => void;
   textInputColumns: number;
   handleSubmitCode: (value: string, url: string) => void;
-  setOAuthStatus: (status: OAuthStatus) => void;
+  setOAuthStatus: React.Dispatch<React.SetStateAction<OAuthStatus>>;
   setLoginWithClaudeAi: (value: boolean) => void;
 };
 
@@ -648,12 +658,13 @@ function OAuthStatusMessage({
                   logEvent('tengu_gemini_api_selected', {});
                   setOAuthStatus({
                     state: 'gemini_api',
-                    baseUrl: process.env.GEMINI_BASE_URL ?? '',
                     apiKey: process.env.GEMINI_API_KEY ?? '',
                     haikuModel: process.env.GEMINI_DEFAULT_HAIKU_MODEL ?? '',
                     sonnetModel: process.env.GEMINI_DEFAULT_SONNET_MODEL ?? '',
                     opusModel: process.env.GEMINI_DEFAULT_OPUS_MODEL ?? '',
-                    activeField: 'base_url',
+                    activeField: 'api_key',
+                    availableModels: [],
+                    isLoadingModels: false,
                   });
                 } else if (value === 'platform') {
                   logEvent('tengu_oauth_platform_selected', {});
@@ -1406,29 +1417,49 @@ function OAuthStatusMessage({
     }
 
     case 'gemini_api': {
-      type GeminiField = 'base_url' | 'api_key' | 'haiku_model' | 'sonnet_model' | 'opus_model';
-      const GEMINI_FIELDS: GeminiField[] = ['base_url', 'api_key', 'haiku_model', 'sonnet_model', 'opus_model'];
+      type GeminiField =
+        | 'api_key'
+        | 'haiku_model'
+        | 'sonnet_model'
+        | 'opus_model'
+        | 'custom_haiku_model'
+        | 'custom_sonnet_model'
+        | 'custom_opus_model';
+      const GEMINI_FIELDS: GeminiField[] = ['api_key', 'haiku_model', 'sonnet_model', 'opus_model'];
       const gp = oauthStatus as {
         state: 'gemini_api';
         activeField: GeminiField;
-        baseUrl: string;
         apiKey: string;
         haikuModel: string;
         sonnetModel: string;
         opusModel: string;
+        availableModels: string[];
+        isLoadingModels: boolean;
+        statusMessage?: string;
       };
-      const { activeField, baseUrl, apiKey, haikuModel, sonnetModel, opusModel } = gp;
-      const geminiDisplayValues: Record<GeminiField, string> = {
-        base_url: baseUrl,
+      const {
+        activeField,
+        apiKey,
+        haikuModel,
+        sonnetModel,
+        opusModel,
+        availableModels,
+        isLoadingModels,
+        statusMessage,
+      } = gp;
+      const geminiDisplayValues: Record<string, string> = {
         api_key: apiKey,
         haiku_model: haikuModel,
         sonnet_model: sonnetModel,
         opus_model: opusModel,
+        custom_haiku_model: haikuModel,
+        custom_sonnet_model: sonnetModel,
+        custom_opus_model: opusModel,
       };
 
-      const [geminiInputValue, setGeminiInputValue] = useState(() => geminiDisplayValues[activeField]);
+      const [geminiInputValue, setGeminiInputValue] = useState(() => geminiDisplayValues[activeField] ?? '');
       const [geminiInputCursorOffset, setGeminiInputCursorOffset] = useState(
-        () => geminiDisplayValues[activeField].length,
+        () => (geminiDisplayValues[activeField] ?? '').length,
       );
 
       const buildGeminiState = useCallback(
@@ -1436,137 +1467,206 @@ function OAuthStatusMessage({
           const s = {
             state: 'gemini_api' as const,
             activeField: newActive ?? activeField,
-            baseUrl,
             apiKey,
             haikuModel,
             sonnetModel,
             opusModel,
+            availableModels,
+            isLoadingModels,
+            statusMessage,
           };
           switch (field) {
-            case 'base_url':
-              return { ...s, baseUrl: value };
             case 'api_key':
               return { ...s, apiKey: value };
             case 'haiku_model':
+            case 'custom_haiku_model':
               return { ...s, haikuModel: value };
             case 'sonnet_model':
+            case 'custom_sonnet_model':
               return { ...s, sonnetModel: value };
             case 'opus_model':
+            case 'custom_opus_model':
               return { ...s, opusModel: value };
+            default:
+              return s;
           }
         },
-        [activeField, baseUrl, apiKey, haikuModel, sonnetModel, opusModel],
+        [activeField, apiKey, haikuModel, sonnetModel, opusModel, availableModels, isLoadingModels, statusMessage],
       );
 
-      const doGeminiSave = useCallback(async () => {
-        const finalVals = { ...geminiDisplayValues, [activeField]: geminiInputValue };
-        if (!finalVals.haiku_model || !finalVals.sonnet_model || !finalVals.opus_model) {
-          setOAuthStatus({
-            state: 'error',
-            message: 'Gemini setup requires Haiku, Sonnet, and Opus model names.',
-            toRetry: {
-              state: 'gemini_api',
-              baseUrl: finalVals.base_url,
-              apiKey: finalVals.api_key,
-              haikuModel: finalVals.haiku_model,
-              sonnetModel: finalVals.sonnet_model,
-              opusModel: finalVals.opus_model,
-              activeField,
-            },
-          });
-          return;
-        }
-
-        if (!finalVals.api_key) {
-          setOAuthStatus({ state: 'waiting_for_login' });
+      const fetchGeminiModels = useCallback(
+        async (currentApiKey: string) => {
+          setOAuthStatus((prev: OAuthStatus) =>
+            prev.state === 'gemini_api'
+              ? {
+                  ...prev,
+                  isLoadingModels: true,
+                  statusMessage: currentApiKey ? 'Fetching models...' : 'Authenticating via browser...',
+                }
+              : prev,
+          );
           try {
-            const { loginToGoogle } = await import('src/services/api/gemini/google-oauth.js');
-            await loginToGoogle();
+            if (!currentApiKey) {
+              const { loginToGoogle } = await import('src/services/api/gemini/google-oauth.js');
+              await loginToGoogle();
+            }
+            const { listGeminiModels } = await import('src/services/api/gemini/client.js');
+            const models = await listGeminiModels(currentApiKey || undefined);
+            setOAuthStatus((prev: OAuthStatus) =>
+              prev.state === 'gemini_api'
+                ? {
+                    ...prev,
+                    availableModels: models,
+                    isLoadingModels: false,
+                    statusMessage: undefined,
+                    activeField: 'haiku_model',
+                  }
+                : prev,
+            );
+            setGeminiInputValue(geminiDisplayValues['haiku_model'] ?? '');
+            setGeminiInputCursorOffset((geminiDisplayValues['haiku_model'] ?? '').length);
           } catch (e) {
+            setOAuthStatus((prev: OAuthStatus) =>
+              prev.state === 'gemini_api'
+                ? {
+                    ...prev,
+                    isLoadingModels: false,
+                    statusMessage: undefined,
+                  }
+                : prev,
+            );
             setOAuthStatus({
               state: 'error',
-              message: `Google Login failed: ${e instanceof Error ? e.message : e}`,
+              message: `Failed to fetch models: ${e instanceof Error ? e.message : e}`,
               toRetry: {
                 state: 'gemini_api',
-                baseUrl: finalVals.base_url,
-                apiKey: finalVals.api_key,
-                haikuModel: finalVals.haiku_model,
-                sonnetModel: finalVals.sonnet_model,
-                opusModel: finalVals.opus_model,
+                apiKey: currentApiKey,
+                haikuModel,
+                sonnetModel,
+                opusModel,
                 activeField: 'api_key',
+                availableModels: [],
+                isLoadingModels: false,
+              },
+            });
+          }
+        },
+        [haikuModel, sonnetModel, opusModel, geminiDisplayValues, setOAuthStatus],
+      );
+
+      const doGeminiSave = useCallback(
+        async (stateToSave: any) => {
+          const {
+            apiKey: finalApiKey,
+            haikuModel: finalHaiku,
+            sonnetModel: finalSonnet,
+            opusModel: finalOpus,
+          } = stateToSave;
+          if (!finalHaiku || !finalSonnet || !finalOpus) {
+            setOAuthStatus({
+              state: 'error',
+              message: 'Gemini setup requires Haiku, Sonnet, and Opus model names.',
+              toRetry: {
+                ...stateToSave,
+                activeField,
               },
             });
             return;
           }
-        }
 
-        const env: Record<string, string> = {};
-        if (finalVals.base_url) env.GEMINI_BASE_URL = finalVals.base_url;
-        if (finalVals.api_key) env.GEMINI_API_KEY = finalVals.api_key;
-        if (finalVals.haiku_model) env.GEMINI_DEFAULT_HAIKU_MODEL = finalVals.haiku_model;
-        if (finalVals.sonnet_model) env.GEMINI_DEFAULT_SONNET_MODEL = finalVals.sonnet_model;
-        if (finalVals.opus_model) env.GEMINI_DEFAULT_OPUS_MODEL = finalVals.opus_model;
-        const { error } = updateSettingsForSource('userSettings', {
-          modelType: 'gemini' as any,
-          env,
-        } as any);
-        if (error) {
-          setOAuthStatus({
-            state: 'error',
-            message: `Failed to save: ${error.message}`,
-            toRetry: {
-              state: 'gemini_api',
-              baseUrl: '',
-              apiKey: '',
-              haikuModel: '',
-              sonnetModel: '',
-              opusModel: '',
-              activeField: 'base_url',
-            },
-          });
-        } else {
-          for (const [k, v] of Object.entries(env)) process.env[k] = v;
-          setOAuthStatus({ state: 'success' });
-          void onDone();
-        }
-      }, [activeField, geminiInputValue, geminiDisplayValues, onDone, setOAuthStatus]);
+          const env: Record<string, string> = {};
+          if (finalApiKey) env.GEMINI_API_KEY = finalApiKey;
+          if (finalHaiku) env.GEMINI_DEFAULT_HAIKU_MODEL = finalHaiku;
+          if (finalSonnet) env.GEMINI_DEFAULT_SONNET_MODEL = finalSonnet;
+          if (finalOpus) env.GEMINI_DEFAULT_OPUS_MODEL = finalOpus;
+          const { error } = updateSettingsForSource('userSettings', {
+            modelType: 'gemini' as any,
+            env,
+          } as any);
+          if (error) {
+            setOAuthStatus({
+              state: 'error',
+              message: `Failed to save: ${error.message}`,
+              toRetry: {
+                ...stateToSave,
+                activeField: 'api_key',
+              },
+            });
+          } else {
+            for (const [k, v] of Object.entries(env)) process.env[k] = v;
+            setOAuthStatus({ state: 'success' });
+            void onDone();
+          }
+        },
+        [activeField, onDone, setOAuthStatus],
+      );
 
       const handleGeminiEnter = useCallback(() => {
-        const idx = GEMINI_FIELDS.indexOf(activeField);
+        if (activeField.startsWith('custom_') && geminiInputValue) {
+          const nextState = buildGeminiState(activeField, geminiInputValue);
+          setOAuthStatus(nextState);
+          doGeminiSave(nextState);
+          return;
+        }
+
+        if (activeField === 'api_key') {
+          const nextState = buildGeminiState(activeField, geminiInputValue);
+          setOAuthStatus(nextState);
+          void fetchGeminiModels(geminiInputValue);
+          return;
+        }
+
+        const idx = GEMINI_FIELDS.indexOf(activeField as any);
         if (idx === GEMINI_FIELDS.length - 1) {
-          setOAuthStatus(buildGeminiState(activeField, geminiInputValue));
-          doGeminiSave();
+          const nextState = buildGeminiState(activeField, geminiInputValue);
+          setOAuthStatus(nextState);
+          doGeminiSave(nextState);
         } else {
           const next = GEMINI_FIELDS[idx + 1]!;
-          setOAuthStatus(buildGeminiState(activeField, geminiInputValue, next));
+          const nextState = buildGeminiState(activeField, geminiInputValue, next);
+          setOAuthStatus(nextState);
           setGeminiInputValue(geminiDisplayValues[next] ?? '');
           setGeminiInputCursorOffset((geminiDisplayValues[next] ?? '').length);
         }
-      }, [activeField, buildGeminiState, doGeminiSave, geminiDisplayValues, geminiInputValue, setOAuthStatus]);
+      }, [
+        activeField,
+        buildGeminiState,
+        doGeminiSave,
+        fetchGeminiModels,
+        geminiDisplayValues,
+        geminiInputValue,
+        setOAuthStatus,
+      ]);
+
+      const isTextInputActive = activeField === 'api_key' || activeField.startsWith('custom_');
 
       useKeybinding(
         'tabs:next',
         () => {
-          const idx = GEMINI_FIELDS.indexOf(activeField);
+          const idx = GEMINI_FIELDS.indexOf(activeField as any);
           if (idx < GEMINI_FIELDS.length - 1) {
-            setOAuthStatus(buildGeminiState(activeField, geminiInputValue, GEMINI_FIELDS[idx + 1]));
-            setGeminiInputValue(geminiDisplayValues[GEMINI_FIELDS[idx + 1]!] ?? '');
-            setGeminiInputCursorOffset((geminiDisplayValues[GEMINI_FIELDS[idx + 1]!] ?? '').length);
+            const next = GEMINI_FIELDS[idx + 1]!;
+            const nextState = buildGeminiState(activeField, geminiInputValue, next);
+            setOAuthStatus(nextState);
+            setGeminiInputValue(geminiDisplayValues[next] ?? '');
+            setGeminiInputCursorOffset((geminiDisplayValues[next] ?? '').length);
           }
         },
-        { context: 'FormField' },
+        { context: 'FormField', isActive: isTextInputActive },
       );
       useKeybinding(
         'tabs:previous',
         () => {
-          const idx = GEMINI_FIELDS.indexOf(activeField);
+          const idx = GEMINI_FIELDS.indexOf(activeField as any);
           if (idx > 0) {
-            setOAuthStatus(buildGeminiState(activeField, geminiInputValue, GEMINI_FIELDS[idx - 1]));
-            setGeminiInputValue(geminiDisplayValues[GEMINI_FIELDS[idx - 1]!] ?? '');
-            setGeminiInputCursorOffset((geminiDisplayValues[GEMINI_FIELDS[idx - 1]!] ?? '').length);
+            const prev = GEMINI_FIELDS[idx - 1]!;
+            const nextState = buildGeminiState(activeField, geminiInputValue, prev);
+            setOAuthStatus(nextState);
+            setGeminiInputValue(geminiDisplayValues[prev] ?? '');
+            setGeminiInputCursorOffset((geminiDisplayValues[prev] ?? '').length);
           }
         },
-        { context: 'FormField' },
+        { context: 'FormField', isActive: isTextInputActive },
       );
       useKeybinding(
         'confirm:no',
@@ -1577,6 +1677,67 @@ function OAuthStatusMessage({
       );
 
       const geminiColumns = useTerminalSize().columns - 20;
+
+      const renderGeminiModelField = (field: GeminiField, customField: GeminiField, label: string) => {
+        const active = activeField === field || activeField === customField;
+        const val = geminiDisplayValues[field];
+
+        return (
+          <Box flexDirection="column">
+            <Box>
+              <Text
+                backgroundColor={activeField === field ? 'suggestion' : undefined}
+                color={activeField === field ? 'inverseText' : undefined}
+              >
+                {` ${label} `}
+              </Text>
+              <Text> </Text>
+              {activeField === field ? (
+                <Select
+                  options={[
+                    ...availableModels.map(m => ({ label: m, value: m })),
+                    { label: 'Custom (Type your own)', value: '__custom__' },
+                  ]}
+                  onChange={val => {
+                    if (val === '__custom__') {
+                      const nextState = buildGeminiState(field, '', customField);
+                      setOAuthStatus(nextState);
+                      setGeminiInputValue('');
+                      setGeminiInputCursorOffset(0);
+                    } else {
+                      const nextState = buildGeminiState(field, val);
+                      if (field === 'opus_model') {
+                        setOAuthStatus(nextState);
+                        doGeminiSave(nextState);
+                      } else {
+                        // Advance to next field
+                        const idx = GEMINI_FIELDS.indexOf(field);
+                        const next = GEMINI_FIELDS[idx + 1]!;
+                        const advancedState = buildGeminiState(field, val, next);
+                        setOAuthStatus(advancedState);
+                        setGeminiInputValue(geminiDisplayValues[next] ?? '');
+                        setGeminiInputCursorOffset((geminiDisplayValues[next] ?? '').length);
+                      }
+                    }
+                  }}
+                />
+              ) : activeField === customField ? (
+                <TextInput
+                  value={geminiInputValue}
+                  onChange={setGeminiInputValue}
+                  onSubmit={handleGeminiEnter}
+                  cursorOffset={geminiInputCursorOffset}
+                  onChangeCursorOffset={setGeminiInputCursorOffset}
+                  columns={geminiColumns}
+                  focus={true}
+                />
+              ) : val ? (
+                <Text color="success">{val}</Text>
+              ) : null}
+            </Box>
+          </Box>
+        );
+      };
 
       const renderGeminiRow = (field: GeminiField, label: string, opts?: { mask?: boolean }) => {
         const active = activeField === field;
@@ -1611,17 +1772,41 @@ function OAuthStatusMessage({
         <Box flexDirection="column" gap={1}>
           <Text bold>Gemini API Setup</Text>
           <Text dimColor>
-            Configure a Gemini Generate Content compatible endpoint. Base URL is optional and defaults to Google&apos;s
-            v1beta API. Leave API Key blank to log in via browser (Google Auth).
+            Configure a Gemini Generate Content compatible endpoint. Models will be fetched automatically. Leave API Key
+            blank to log in via browser (Google Auth).
           </Text>
+
           <Box flexDirection="column" gap={1}>
-            {renderGeminiRow('base_url', 'Base URL ')}
-            {renderGeminiRow('api_key', 'API Key  ', { mask: true })}
-            {renderGeminiRow('haiku_model', 'Haiku    ')}
-            {renderGeminiRow('sonnet_model', 'Sonnet   ')}
-            {renderGeminiRow('opus_model', 'Opus     ')}
+            {(activeField === 'api_key' ||
+              GEMINI_FIELDS.indexOf(activeField as any) >= GEMINI_FIELDS.indexOf('api_key')) &&
+              renderGeminiRow('api_key', 'API Key  ', { mask: true })}
+
+            {isLoadingModels && (
+              <Box gap={1}>
+                <Spinner />
+                <Text>{statusMessage || 'Loading...'}</Text>
+              </Box>
+            )}
+
+            {!isLoadingModels &&
+              (activeField === 'haiku_model' ||
+                activeField === 'custom_haiku_model' ||
+                GEMINI_FIELDS.indexOf(activeField as any) > GEMINI_FIELDS.indexOf('haiku_model')) &&
+              renderGeminiModelField('haiku_model', 'custom_haiku_model', 'Haiku    ')}
+
+            {!isLoadingModels &&
+              (activeField === 'sonnet_model' ||
+                activeField === 'custom_sonnet_model' ||
+                GEMINI_FIELDS.indexOf(activeField as any) > GEMINI_FIELDS.indexOf('sonnet_model')) &&
+              renderGeminiModelField('sonnet_model', 'custom_sonnet_model', 'Sonnet   ')}
+
+            {!isLoadingModels &&
+              (activeField === 'opus_model' ||
+                activeField === 'custom_opus_model' ||
+                GEMINI_FIELDS.indexOf(activeField as any) > GEMINI_FIELDS.indexOf('opus_model')) &&
+              renderGeminiModelField('opus_model', 'custom_opus_model', 'Opus     ')}
           </Box>
-          <Text dimColor>↑↓/Tab to switch · Enter on last field to save · Esc to go back</Text>
+          <Text dimColor>↑↓ to select options · Enter to save/fetch models · Esc to go back</Text>
         </Box>
       );
     }

@@ -143,20 +143,18 @@ If you encounter a bug, please open an issue; we prioritize solving them.
 
 ### 👤 New User Configuration /login
 
-After running for the first time, type `/login` in the REPL to enter the login configuration interface. Select **Anthropic Compatible** to connect to third-party API services (no official Anthropic account required).
-Options for OpenAI and Gemini are also available for their respective protocols.
+After running for the first time, type `/login` in the REPL to enter the login configuration interface. 
 
-Fields to fill in:
-
-| 📌 Field | 📝 Description | 💡 Example |
-| --- | --- | --- |
-| Base URL | API Service Address | `https://api.example.com/v1` |
-| API Key | Authentication Key | `sk-xxx` |
-| Haiku Model | Fast Model ID | `claude-haiku-4-5-20251001` |
-| Sonnet Model | Balanced Model ID | `claude-sonnet-4-6` |
-| Opus Model | High Performance Model ID | `claude-opus-4-6` |
-
-- ⌨️ **Tab / Shift+Tab** to switch fields, **Enter** to confirm and jump to the next, press Enter on the last field to save.
+1. **Anthropic Compatible**: Connect to third-party API services (OpenRouter, AWS Bedrock proxies, etc.) (no official Anthropic account required).
+2. **OpenAI / Gemini / Grok**: Connect to cloud services using their respective protocols.
+   - **Gemini (Google Auth)**: Supports interactive browser login. 
+     1. In the Google Cloud Console, navigate to **APIs & Services > OAuth consent screen** and configure the OAuth client (Set User Type to External).
+     2. Download the credentials JSON format and save it as `/.files/OAuth.json` in the project root.
+     3. Leave the API Key field blank and press Enter in the `/login` configuration interface; the CLI will automatically open your browser for Google OAuth 2.0 authorization and fetch available models.
+3. **Local LLM**: **(Recommended)** Use models running locally.
+   - Supports **Ollama**, **LM Studio**, **Jan.ai**, **LocalAI**.
+   - **Ollama Deep Integration**: View installed models directly in the CLI, or enter a model name (e.g., `llama3.1`) to pull it instantly. Supports interactive model selection navigation and hardware status auto-detection.
+   - Automatically detects local runner status and default ports.
 
 > ℹ️ Supports all Anthropic API compatible services (e.g., OpenRouter, AWS Bedrock proxies, etc.), as long as the interface is compatible with the Messages API.
 

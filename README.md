@@ -150,23 +150,16 @@ bun run build
 
 1. **Anthropic Compatible**: 对接第三方 API 兼容服务（OpenRouter、AWS Bedrock 代理等）。
 2. **OpenAI / Gemini / Grok**: 对应各自协议的云端服务。
+   - **Gemini (Google Auth)**: 支持交互式浏览器登录。
+     1. 在 Google Cloud Console 的 **APIs & Services > OAuth consent screen** 中配置 OAuth 客户端（User Type 设为 External）。
+     2. 下载 credentials JSON 文件并保存到项目根目录的 `/.files/OAuth.json`。
+     3. 在 `/login` 配置界面中留空 API Key 并按 Enter，程序将自动拉起浏览器完成授权并自动拉取模型列表。
 3. **Local LLM**: **(推荐)** 使用本地运行的模型。
    - 支持 **Ollama**, **LM Studio**, **Jan.ai**, **LocalAI**。
-   - **Ollama 深度集成**: 可直接在 CLI 中查看已安装模型，或输入模型名（如 `llama3.1`）一键拉取（Pull）。
+   - **Ollama 深度集成**: 可直接在 CLI 中查看已安装模型，或输入模型名（如 `llama3.1`）一键拉取（Pull）。支持模型列表交互切换和硬件状态自动检测。
    - 自动检测本地运行状态和默认端口。
 
 #### /login 字段说明 (云端模式)：
-
-
-| 📌 字段      | 📝 说明       | 💡 示例                      |
-| ------------ | ------------- | ---------------------------- |
-| Base URL     | API 服务地址  | `https://api.example.com/v1` |
-| API Key      | 认证密钥      | `sk-xxx`                     |
-| Haiku Model  | 快速模型 ID   | `claude-haiku-4-5-20251001`  |
-| Sonnet Model | 均衡模型 ID   | `claude-sonnet-4-6`          |
-| Opus Model   | 高性能模型 ID | `claude-opus-4-6`            |
-
-- ⌨️ **Tab / Shift+Tab** 切换字段，**Enter** 确认并跳到下一个，最后一个字段按 Enter 保存
 
 > ℹ️ 支持所有 Anthropic API 兼容服务（如 OpenRouter、AWS Bedrock 代理等），只要接口兼容 Messages API 即可。
 
