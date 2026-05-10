@@ -9,6 +9,7 @@ mock.module('react', () => ({
   useCallback: (fn: any) => fn,
   useMemo: (fn: any) => fn(),
   useContext: () => ({}),
+  useLayoutEffect: () => {}, // Add a simple mock for useLayoutEffect
 }));
 
 import { ConsoleOAuthFlow } from '../ConsoleOAuthFlow.js';
