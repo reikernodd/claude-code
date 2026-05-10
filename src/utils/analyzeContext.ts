@@ -229,6 +229,10 @@ export interface ContextData {
     cache_creation_input_tokens: number
     cache_read_input_tokens: number
   } | null
+  /** Cache hit rate percentage (0-100), undefined if no data */
+  readonly cacheHitRate?: number
+  /** Cache warning threshold percentage */
+  readonly cacheThreshold?: number
 }
 
 export async function countToolDefinitionTokens(
@@ -383,11 +387,11 @@ async function countBuiltInToolTokens(
   }
 
   // Check if tool search is enabled
-  const { isToolSearchEnabled } = await import('./toolSearch.js')
+  const { isSearchExtraToolsEnabled } = await import('./searchExtraTools.js')
   const { isDeferredTool } = await import(
-    '@claude-code-best/builtin-tools/tools/ToolSearchTool/prompt.js'
+    '@claude-code-best/builtin-tools/tools/SearchExtraToolsTool/prompt.js'
   )
-  const isDeferred = await isToolSearchEnabled(
+  const isDeferred = await isSearchExtraToolsEnabled(
     model ?? '',
     tools,
     getToolPermissionContext,
@@ -668,13 +672,13 @@ export async function countMcpToolTokens(
   )
 
   // Check if tool search is enabled - if so, MCP tools are deferred
-  // isToolSearchEnabled handles threshold calculation internally for TstAuto mode
-  const { isToolSearchEnabled } = await import('./toolSearch.js')
+  // isSearchExtraToolsEnabled handles threshold calculation internally for TstAuto mode
+  const { isSearchExtraToolsEnabled } = await import('./searchExtraTools.js')
   const { isDeferredTool } = await import(
-    '@claude-code-best/builtin-tools/tools/ToolSearchTool/prompt.js'
+    '@claude-code-best/builtin-tools/tools/SearchExtraToolsTool/prompt.js'
   )
 
-  const isDeferred = await isToolSearchEnabled(
+  const isDeferred = await isSearchExtraToolsEnabled(
     model,
     tools,
     getToolPermissionContext,
@@ -682,7 +686,7 @@ export async function countMcpToolTokens(
     'analyzeMcp',
   )
 
-  // Find MCP tools that have been used in messages (loaded via ToolSearchTool)
+  // Find MCP tools that have been used in messages (loaded via SearchExtraToolsTool)
   const loadedMcpToolNames = new Set<string>()
   if (isDeferred && messages) {
     const mcpToolNameSet = new Set(mcpTools.map(t => t.name))
@@ -1396,5 +1400,13 @@ export async function analyzeContextUsage(
     isAutoCompactEnabled: isAutoCompact,
     messageBreakdown: formattedMessageBreakdown,
     apiUsage,
+    ...(() => {
+      if (!apiUsage) return {}
+      const { calculateCacheHitRate, getCacheThreshold } =
+        require('./cacheWarning.js') as typeof import('./cacheWarning.js')
+      const hitRate = calculateCacheHitRate(apiUsage)
+      if (hitRate === null) return {}
+      return { cacheHitRate: hitRate, cacheThreshold: getCacheThreshold() }
+    })(),
   }
 }
