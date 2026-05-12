@@ -16,6 +16,8 @@ src/utils/vendor/
 .claude/*
 .omx/*
 .docs/task/*
+.files/
+
 # Binary / screenshot files (root only)
 /*.png
 *.bmp
