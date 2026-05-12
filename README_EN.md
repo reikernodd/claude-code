@@ -149,14 +149,21 @@ After running for the first time, type `/login` in the REPL to enter the login c
 2. **OpenAI / Gemini / Grok**: Connect to cloud services using their respective protocols.
    - **Gemini (Google Auth)**: Supports interactive browser login. 
      1. In the Google Cloud Console, navigate to **APIs & Services > OAuth consent screen** and configure the OAuth client (Set User Type to External).
-     2. Download the credentials JSON format and save it as `/.files/OAuth.json` in the project root.
-     3. Leave the API Key field blank and press Enter in the `/login` configuration interface; the CLI will automatically open your browser for Google OAuth 2.0 authorization and fetch available models.
+     2. Download the credentials JSON format and save it as `.files/OAuth.json` in the project root.     3. Leave the API Key field blank and press Enter in the `/login` configuration interface; the CLI will automatically open your browser for Google OAuth 2.0 authorization and fetch available models.
 3. **Local LLM**: **(Recommended)** Use models running locally.
    - Supports **Ollama**, **LM Studio**, **Jan.ai**, **LocalAI**.
    - **Ollama Deep Integration**: View installed models directly in the CLI, or enter a model name (e.g., `llama3.1`) to pull it instantly. Supports interactive model selection navigation and hardware status auto-detection.
    - Automatically detects local runner status and default ports.
 
 > ℹ️ Supports all Anthropic API compatible services (e.g., OpenRouter, AWS Bedrock proxies, etc.), as long as the interface is compatible with the Messages API.
+
+## Environment Variables
+
+In addition to interactive `/login` configuration, you can also configure the CLI via environment variables:
+
+- `LOCAL_BASE_URL`: The base URL for the local LLM runner (e.g., `http://localhost:11434`).
+- `LOCAL_MODEL`: The model name for the local LLM (e.g., `llama3.1`). Overrides the default model when using the `local` provider.
+- `GEMINI_BASE_URL`: Custom base URL for the Gemini API.
 
 ## Feature Flags
 

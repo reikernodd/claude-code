@@ -152,8 +152,7 @@ bun run build
 2. **OpenAI / Gemini / Grok**: 对应各自协议的云端服务。
    - **Gemini (Google Auth)**: 支持交互式浏览器登录。
      1. 在 Google Cloud Console 的 **APIs & Services > OAuth consent screen** 中配置 OAuth 客户端（User Type 设为 External）。
-     2. 下载 credentials JSON 文件并保存到项目根目录的 `/.files/OAuth.json`。
-     3. 在 `/login` 配置界面中留空 API Key 并按 Enter，程序将自动拉起浏览器完成授权并自动拉取模型列表。
+     2. 下载 credentials JSON 文件并保存到项目根目录的 `.files/OAuth.json`。     3. 在 `/login` 配置界面中留空 API Key 并按 Enter，程序将自动拉起浏览器完成授权并自动拉取模型列表。
 3. **Local LLM**: **(推荐)** 使用本地运行的模型。
    - 支持 **Ollama**, **LM Studio**, **Jan.ai**, **LocalAI**。
    - **Ollama 深度集成**: 可直接在 CLI 中查看已安装模型，或输入模型名（如 `llama3.1`）一键拉取（Pull）。支持模型列表交互切换和硬件状态自动检测。
@@ -171,6 +170,14 @@ bun run build
 - **本地环境**: 检查 Ollama 等本地 Runner 是否正在运行，并列出所有可用模型。
 - **配置校验**: 检查环境变量（如 `LOCAL_BASE_URL`）和权限设置。
 - **故障排查**: 识别多个重复安装的版本、过期的版本锁或权限不足的更新。
+
+## 环境变量 (Environment Variables)
+
+除了交互式 `/login` 配置外，你也可以通过环境变量直接配置：
+
+- `LOCAL_BASE_URL`: 本地 LLM 运行地址 (例如 `http://localhost:11434`)。
+- `LOCAL_MODEL`: 本地 LLM 模型名称 (例如 `llama3.1`)。用于 `local` provider 时覆盖默认模型。
+- `GEMINI_BASE_URL`: Gemini API 的自定义基础地址。
 
 ## Feature Flags
 

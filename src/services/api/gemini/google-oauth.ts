@@ -61,11 +61,11 @@ export async function loginToGoogle(): Promise<void> {
     // Save tokens
     updateSettingsForSource('userSettings', {
       googleOAuth: {
-        access_token: tokens.access_token,
-        refresh_token: tokens.refresh_token,
-        expiry_date: tokens.expiry_date,
+        access_token: tokens.access_token ?? undefined,
+        refresh_token: tokens.refresh_token ?? undefined,
+        expiry_date: tokens.expiry_date ?? undefined,
       },
-    } as any)
+    })
 
     listener.handleSuccessRedirect(SCOPES, res => {
       res.writeHead(200, { 'Content-Type': 'text/html' })
@@ -107,7 +107,7 @@ export async function loginToGoogle(): Promise<void> {
 
 export async function getGoogleAccessToken(): Promise<string | null> {
   const settings = getSettings()
-  const googleOAuth = (settings as any).googleOAuth
+  const googleOAuth = settings.googleOAuth
 
   if (!googleOAuth || !googleOAuth.refresh_token) {
     return null
@@ -129,18 +129,18 @@ export async function getGoogleAccessToken(): Promise<string | null> {
     if (credentials.access_token !== googleOAuth.access_token) {
       updateSettingsForSource('userSettings', {
         googleOAuth: {
-          access_token: credentials.access_token,
+          access_token: credentials.access_token ?? undefined,
           refresh_token: credentials.refresh_token || googleOAuth.refresh_token,
-          expiry_date: credentials.expiry_date,
+          expiry_date: credentials.expiry_date ?? undefined,
         },
-      } as any)
+      })
     }
     return credentials.access_token || null
   } catch (error) {
     // If refresh fails, clear it
     updateSettingsForSource('userSettings', {
       googleOAuth: undefined,
-    } as any)
+    })
     return null
   }
 }

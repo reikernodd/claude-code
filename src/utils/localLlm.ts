@@ -8,7 +8,10 @@ export async function checkOllamaStatus(
   baseUrl: string = 'http://localhost:11434',
 ): Promise<boolean> {
   try {
-    const response = await fetch(`${baseUrl}/api/tags`, { method: 'GET' })
+    const response = await fetch(`${baseUrl}/api/tags`, {
+      method: 'GET',
+      signal: AbortSignal.timeout(5000),
+    })
     return response.ok
   } catch (error) {
     logForDebugging(`Ollama status check failed: ${error}`)
@@ -20,7 +23,9 @@ export async function listOllamaModels(
   baseUrl: string = 'http://localhost:11434',
 ): Promise<string[]> {
   try {
-    const response = await fetch(`${baseUrl}/api/tags`)
+    const response = await fetch(`${baseUrl}/api/tags`, {
+      signal: AbortSignal.timeout(5000),
+    })
     if (!response.ok) return []
     const data = (await response.json()) as { models: OllamaModel[] }
     return data.models.map(m => m.name)
@@ -37,6 +42,7 @@ export async function* pullOllamaModel(
 ): AsyncGenerator<{ status: string; percentage?: number }> {
   const response = await fetch(`${baseUrl}/api/pull`, {
     method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ name: model }),
     signal,
   })

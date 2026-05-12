@@ -13,7 +13,10 @@ const DEFAULT_GEMINI_BASE_URL =
 const STREAM_DECODE_OPTS: TextDecodeOptions = { stream: true }
 
 function getGeminiBaseUrl(): string {
-  return DEFAULT_GEMINI_BASE_URL.replace(/\/+$/, '')
+  return (process.env.GEMINI_BASE_URL || DEFAULT_GEMINI_BASE_URL).replace(
+    /\/+$/,
+    '',
+  )
 }
 
 function getGeminiModelPath(model: string): string {
@@ -54,7 +57,13 @@ export async function listGeminiModels(apiKey?: string): Promise<string[]> {
     return []
   }
 
-  return data.models.map((m: any) => m.name.replace(/^models\//, ''))
+  const models: string[] = []
+  for (const m of data.models) {
+    if (m && typeof m === 'object' && typeof m.name === 'string') {
+      models.push(m.name.replace(/^models\//, ''))
+    }
+  }
+  return models
 }
 
 export async function* streamGeminiGenerateContent(params: {

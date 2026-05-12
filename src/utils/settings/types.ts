@@ -362,6 +362,14 @@ export const SettingsSchema = lazySchema(() =>
         .describe(
           "Include built-in commit and PR workflow instructions in Claude's system prompt (default: true)",
         ),
+      googleOAuth: z
+        .object({
+          access_token: z.string().optional(),
+          refresh_token: z.string().optional(),
+          expiry_date: z.number().optional(),
+        })
+        .optional()
+        .describe('Google OAuth credentials for Gemini API'),
       permissions: PermissionsSchema()
         .optional()
         .describe('Tool usage permissions configuration'),

@@ -620,6 +620,7 @@ export async function getDoctorDiagnostic(): Promise<DiagnosticInfo> {
   const ollamaRunning = await checkOllamaStatus()
   const ollamaModels = ollamaRunning ? await listOllamaModels() : []
 
+  const cpuInfo = cpus()
   const diagnostic: DiagnosticInfo = {
     installationType,
     version,
@@ -644,10 +645,10 @@ export async function getDoctorDiagnostic(): Promise<DiagnosticInfo> {
       },
     },
     hardwareInfo: {
-      cpus: cpus().length,
-      cpuModel: cpus()[0]?.model || 'Unknown',
-      totalMem: Math.round(totalmem() / 1024 / 1024 / 1024) + ' GB',
-      freeMem: Math.round(freemem() / 1024 / 1024 / 1024) + ' GB',
+      cpus: cpuInfo.length,
+      cpuModel: cpuInfo[0]?.model || 'Unknown',
+      totalMem: (totalmem() / 1024 ** 3).toFixed(1) + ' GB',
+      freeMem: (freemem() / 1024 ** 3).toFixed(1) + ' GB',
       arch: arch(),
     },
   }

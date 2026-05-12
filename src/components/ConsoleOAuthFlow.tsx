@@ -88,6 +88,7 @@ type OAuthStatus =
     }
   | {
       state: 'local_llm_pulling';
+      baseUrl: string;
       modelName: string;
       status: string;
       percentage?: number;
@@ -102,6 +103,8 @@ type OAuthStatus =
       message: string;
       toRetry?: OAuthStatus;
     };
+
+type LocalLlmSetupState = Extract<OAuthStatus, { state: 'local_llm_setup' }>;
 
 const PASTE_HERE_MSG = 'Paste code here if prompted > ';
 const POPULAR_MODELS = ['llama3.1', 'mistral', 'phi3', 'qwen2', 'gemma2', 'codellama'];
@@ -206,13 +209,10 @@ export function ConsoleOAuthFlow({
   useEffect(() => {
     if (oauthStatus.state === 'local_llm_pulling') {
       const abortController = new AbortController();
+      const { baseUrl, modelName } = oauthStatus;
       (async () => {
         try {
-          for await (const progress of pullOllamaModel(
-            oauthStatus.modelName,
-            'http://localhost:11434',
-            abortController.signal,
-          )) {
+          for await (const progress of pullOllamaModel(modelName, baseUrl, abortController.signal)) {
             setOAuthStatus(prev =>
               prev.state === 'local_llm_pulling'
                 ? {
@@ -227,8 +227,8 @@ export function ConsoleOAuthFlow({
           setOAuthStatus({
             state: 'local_llm_setup',
             runnerType: 'ollama',
-            baseUrl: 'http://localhost:11434',
-            modelName: oauthStatus.modelName,
+            baseUrl,
+            modelName,
             activeField: 'model_name',
             availableModels: [],
             isLoadingModels: false,
@@ -718,7 +718,7 @@ function OAuthStatusMessage({
       const displayValues: Record<LocalField, string> = {
         runner_type: oauthStatus.runnerType,
         base_url: oauthStatus.baseUrl,
-        api_key: (oauthStatus as any).apiKey ?? '',
+        api_key: oauthStatus.apiKey ?? '',
         model_name: oauthStatus.modelName,
         custom_model_name: oauthStatus.modelName,
       };
@@ -727,10 +727,10 @@ function OAuthStatusMessage({
       const [localInputCursorOffset, setLocalInputCursorOffset] = useState((displayValues[activeField] ?? '').length);
 
       const buildLocalState = useCallback(
-        (field: LocalField, val: string, nextField?: LocalField): OAuthStatus => {
-          const newState = { ...oauthStatus } as any;
+        (field: LocalField, val: string, nextField?: LocalField): LocalLlmSetupState => {
+          const newState = { ...oauthStatus };
           if (field === 'runner_type') {
-            newState.runnerType = val;
+            newState.runnerType = val as LocalLlmSetupState['runnerType'];
             if (val === 'ollama') newState.baseUrl = 'http://localhost:11434';
             else if (val === 'lmstudio') newState.baseUrl = 'http://localhost:1234/v1';
             else if (val === 'jan') newState.baseUrl = 'http://localhost:1337/v1';
@@ -749,7 +749,7 @@ function OAuthStatusMessage({
       );
 
       const doLocalSave = useCallback(
-        async (stateToSave: any) => {
+        async (stateToSave: LocalLlmSetupState) => {
           const { runnerType, baseUrl, modelName, apiKey } = stateToSave;
           const env: Record<string, string> = {
             LOCAL_BASE_URL: baseUrl,
@@ -761,11 +761,11 @@ function OAuthStatusMessage({
           updateSettingsForSource('userSettings', {
             modelType: 'local',
             env,
-          } as any);
+          });
 
           updateSettingsForSource('userSettings', {
             model: modelName || 'llama3.1',
-          } as any);
+          });
 
           setOAuthStatus({ state: 'success' });
           void onDone();
@@ -778,6 +778,7 @@ function OAuthStatusMessage({
           if (oauthStatus.runnerType === 'ollama' && !oauthStatus.availableModels.includes(localInputValue)) {
             setOAuthStatus({
               state: 'local_llm_pulling',
+              baseUrl: oauthStatus.baseUrl,
               modelName: localInputValue,
               status: 'Starting download...',
             });
@@ -797,7 +798,7 @@ function OAuthStatusMessage({
         } else {
           // find next interactive field (skip model_name if custom_model_name is next, but that's handled by onChange)
           const next = LOCAL_FIELDS[idx + 1]!;
-          const nextState = buildLocalState(activeField, localInputValue, next) as any;
+          const nextState = buildLocalState(activeField, localInputValue, next);
           setOAuthStatus(nextState);
           const nextVal =
             nextState[
@@ -821,7 +822,7 @@ function OAuthStatusMessage({
           const idx = LOCAL_FIELDS.indexOf(activeField);
           if (idx < LOCAL_FIELDS.length - 1) {
             const next = LOCAL_FIELDS[idx + 1]!;
-            const nextState = buildLocalState(activeField, localInputValue, next) as any;
+            const nextState = buildLocalState(activeField, localInputValue, next);
             setOAuthStatus(nextState);
             const nextVal =
               nextState[
@@ -847,7 +848,7 @@ function OAuthStatusMessage({
           const idx = LOCAL_FIELDS.indexOf(activeField);
           if (idx > 0) {
             const next = LOCAL_FIELDS[idx - 1]!;
-            const nextState = buildLocalState(activeField, localInputValue, next) as any;
+            const nextState = buildLocalState(activeField, localInputValue, next);
             setOAuthStatus(nextState);
             const nextVal =
               nextState[
@@ -929,7 +930,7 @@ function OAuthStatusMessage({
                 <Select
                   options={runnerTypeOptions}
                   onChange={val => {
-                    const nextState = buildLocalState('runner_type', val, 'base_url') as any;
+                    const nextState = buildLocalState('runner_type', val, 'base_url');
                     setOAuthStatus(nextState);
                     setLocalInputValue(nextState.baseUrl ?? '');
                     setLocalInputCursorOffset((nextState.baseUrl ?? '').length);
@@ -975,7 +976,7 @@ function OAuthStatusMessage({
                           ]}
                           onChange={val => {
                             if (val === '__custom__') {
-                              const nextState = buildLocalState('model_name', '', 'custom_model_name') as any;
+                              const nextState = buildLocalState('model_name', '', 'custom_model_name');
                               setOAuthStatus(nextState);
                               setLocalInputValue('');
                               setLocalInputCursorOffset(0);
@@ -984,6 +985,7 @@ function OAuthStatusMessage({
                               if (oauthStatus.runnerType === 'ollama' && !oauthStatus.availableModels.includes(val)) {
                                 setOAuthStatus({
                                   state: 'local_llm_pulling',
+                                  baseUrl: oauthStatus.baseUrl,
                                   modelName: val,
                                   status: 'Starting download...',
                                 });
@@ -1701,9 +1703,9 @@ function OAuthStatusMessage({
           if (finalSonnet) env.GEMINI_DEFAULT_SONNET_MODEL = finalSonnet;
           if (finalOpus) env.GEMINI_DEFAULT_OPUS_MODEL = finalOpus;
           const { error } = updateSettingsForSource('userSettings', {
-            modelType: 'gemini' as any,
+            modelType: 'gemini',
             env,
-          } as any);
+          });
           if (error) {
             setOAuthStatus({
               state: 'error',
