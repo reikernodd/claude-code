@@ -16,22 +16,22 @@ A source code decompilation/reverse engineering project of the official [Claude 
 
 [Documentation here, PR submissions welcome](https://ccb.agent-aura.top/) | [Friends list documentation here](./Friends.md) | [Discord Group](https://discord.gg/uApuzJWGKX)
 
-| Feature | Description | Documentation |
-| --- | --- | --- |
-| **Claude Group Control** | Pipe IPC multi-instance collaboration: Automatic orchestration of local main/sub instances + zero-config LAN discovery and communication, `/pipes` selection panel + `Shift+↓` interaction + message broadcast routing | [Pipe IPC](https://ccb.agent-aura.top/docs/features/uds-inbox) / [LAN](https://ccb.agent-aura.top/docs/features/lan-pipes) |
-| **First-class ACP Protocol Support** | Supports integration with IDEs like Zed and Cursor, session recovery, Skills, and permission bridging | [Documentation](https://ccb.agent-aura.top/docs/features/acp-zed) |
-| **Remote Control Private Deployment** | Docker self-hosted remote interface, allowing you to use CC on your phone | [Documentation](https://ccb.agent-aura.top/docs/features/remote-control-self-hosting) |
-| **Langfuse Monitoring** | Enterprise-grade Agent monitoring, clearly see every agent loop detail, and convert to datasets with one click | [Documentation](https://ccb.agent-aura.top/docs/features/langfuse-monitoring) |
-| **Web Search** | Built-in web search tool, supports Bing and Brave search | [Documentation](https://ccb.agent-aura.top/docs/features/web-browser-tool) |
-| **Poor Mode** | For the budget-conscious: disables memory extraction and typing suggestions, significantly reducing concurrent requests | Toggle with `/poor` |
-| **Channels Notifications** | MCP server pushes external messages to sessions (Feishu/Slack/Discord/WeChat, etc.), enabled with `--channels plugin:name@marketplace` | [Documentation](https://ccb.agent-aura.top/docs/features/channels) |
-| **Custom Model Providers** | Compatible with OpenAI/Anthropic/Gemini/Grok (`/login`) | [Documentation](https://ccb.agent-aura.top/docs/features/all-features-guide) |
-| Voice Mode | Voice input, supports Doubao voice input (`/voice doubao`) | [Documentation](https://ccb.agent-aura.top/docs/features/voice-mode) |
-| Computer Use | Screenshots, keyboard and mouse control | [Documentation](https://ccb.agent-aura.top/docs/features/computer-use) |
-| Chrome Use | Browser automation, form filling, data scraping | [Self-hosted](https://ccb.agent-aura.top/docs/features/chrome-use-mcp) [Native version](https://ccb.agent-aura.top/docs/features/claude-in-chrome-mcp) |
-| Sentry | Enterprise-grade error tracking | [Documentation](https://ccb.agent-aura.top/docs/internals/sentry-setup) |
-| GrowthBook | Enterprise-grade feature flags | [Documentation](https://ccb.agent-aura.top/docs/internals/growthbook-adapter) |
-| /dream Memory Consolidation | Automatically organize and optimize memory files | [Documentation](https://ccb.agent-aura.top/docs/features/auto-dream) |
+| Feature                               | Description                                                                                                                                                                                                            | Documentation                                                                                                                                          |
+| ------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Claude Group Control**              | Pipe IPC multi-instance collaboration: Automatic orchestration of local main/sub instances + zero-config LAN discovery and communication, `/pipes` selection panel + `Shift+↓` interaction + message broadcast routing | [Pipe IPC](https://ccb.agent-aura.top/docs/features/uds-inbox) / [LAN](https://ccb.agent-aura.top/docs/features/lan-pipes)                             |
+| **First-class ACP Protocol Support**  | Supports integration with IDEs like Zed and Cursor, session recovery, Skills, and permission bridging                                                                                                                  | [Documentation](https://ccb.agent-aura.top/docs/features/acp-zed)                                                                                      |
+| **Remote Control Private Deployment** | Docker self-hosted remote interface, allowing you to use CC on your phone                                                                                                                                              | [Documentation](https://ccb.agent-aura.top/docs/features/remote-control-self-hosting)                                                                  |
+| **Langfuse Monitoring**               | Enterprise-grade Agent monitoring, clearly see every agent loop detail, and convert to datasets with one click                                                                                                         | [Documentation](https://ccb.agent-aura.top/docs/features/langfuse-monitoring)                                                                          |
+| **Web Search**                        | Built-in web search tool, supports Bing and Brave search                                                                                                                                                               | [Documentation](https://ccb.agent-aura.top/docs/features/web-browser-tool)                                                                             |
+| **Poor Mode**                         | For the budget-conscious: disables memory extraction and typing suggestions, significantly reducing concurrent requests                                                                                                | Toggle with `/poor`                                                                                                                                    |
+| **Channels Notifications**            | MCP server pushes external messages to sessions (Feishu/Slack/Discord/WeChat, etc.), enabled with `--channels plugin:name@marketplace`                                                                                 | [Documentation](https://ccb.agent-aura.top/docs/features/channels)                                                                                     |
+| **Custom Model Providers**            | Compatible with OpenAI/Anthropic/Gemini/Grok (`/login`)                                                                                                                                                                | [Documentation](https://ccb.agent-aura.top/docs/features/all-features-guide)                                                                           |
+| Voice Mode                            | Voice input, supports Doubao voice input (`/voice doubao`)                                                                                                                                                             | [Documentation](https://ccb.agent-aura.top/docs/features/voice-mode)                                                                                   |
+| Computer Use                          | Screenshots, keyboard and mouse control                                                                                                                                                                                | [Documentation](https://ccb.agent-aura.top/docs/features/computer-use)                                                                                 |
+| Chrome Use                            | Browser automation, form filling, data scraping                                                                                                                                                                        | [Self-hosted](https://ccb.agent-aura.top/docs/features/chrome-use-mcp) [Native version](https://ccb.agent-aura.top/docs/features/claude-in-chrome-mcp) |
+| Sentry                                | Enterprise-grade error tracking                                                                                                                                                                                        | [Documentation](https://ccb.agent-aura.top/docs/internals/sentry-setup)                                                                                |
+| GrowthBook                            | Enterprise-grade feature flags                                                                                                                                                                                         | [Documentation](https://ccb.agent-aura.top/docs/internals/growthbook-adapter)                                                                          |
+| /dream Memory Consolidation           | Automatically organize and optimize memory files                                                                                                                                                                       | [Documentation](https://ccb.agent-aura.top/docs/features/auto-dream)                                                                                   |
 
 - 🚀 [Quick Start (Source Code Version)](#-quick-start-source-code-version)
 - 🐛 [Debugging the Project](#vs-code-debugging)
@@ -143,13 +143,13 @@ If you encounter a bug, please open an issue; we prioritize solving them.
 
 ### 👤 New User Configuration /login
 
-After running for the first time, type `/login` in the REPL to enter the login configuration interface. 
+After running for the first time, type `/login` in the REPL to enter the login configuration interface.
 
 1. **Anthropic Compatible**: Connect to third-party API services (OpenRouter, AWS Bedrock proxies, etc.) (no official Anthropic account required).
 2. **OpenAI / Gemini / Grok**: Connect to cloud services using their respective protocols.
-   - **Gemini (Google Auth)**: Supports interactive browser login. 
+   - **Gemini (Google Auth)**: Supports interactive browser login.
      1. In the Google Cloud Console, navigate to **APIs & Services > OAuth consent screen** and configure the OAuth client (Set User Type to External).
-     2. Download the credentials JSON format and save it as `.files/OAuth.json` in the project root.     3. Leave the API Key field blank and press Enter in the `/login` configuration interface; the CLI will automatically open your browser for Google OAuth 2.0 authorization and fetch available models.
+     2. Download the credentials JSON format and save it as `.files/OAuth.json` in the project root. 3. Leave the API Key field blank and press Enter in the `/login` configuration interface; the CLI will automatically open your browser for Google OAuth 2.0 authorization and fetch available models.
 3. **Local LLM**: **(Recommended)** Use models running locally.
    - Supports **Ollama**, **LM Studio**, **Jan.ai**, **LocalAI**.
    - **Ollama Deep Integration**: View installed models directly in the CLI, or enter a model name (e.g., `llama3.1`) to pull it instantly. Supports interactive model selection navigation and hardware status auto-detection.
@@ -163,7 +163,6 @@ In addition to interactive `/login` configuration, you can also configure the CL
 
 - `LOCAL_BASE_URL`: The base URL for the local LLM runner (e.g., `http://localhost:11434`).
 - `LOCAL_MODEL`: The model name for the local LLM (e.g., `llama3.1`). Overrides the default model when using the `local` provider.
-- `GEMINI_BASE_URL`: Custom base URL for the Gemini API.
 
 ## Feature Flags
 
@@ -188,8 +187,8 @@ TUI (REPL) mode requires a real terminal and cannot be debugged directly via a V
     ```
 
     It will output an address like `ws://localhost:8888/xxxxxxxx`.
-2.  **Attach the VS Code debugger**:
 
+2.  **Attach the VS Code debugger**:
     - Set breakpoints in `src/` files.
     - Press F5 → Select **"Attach to Bun (TUI debug)"**.
 
