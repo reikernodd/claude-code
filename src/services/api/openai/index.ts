@@ -67,6 +67,7 @@ import {
   isDeferredTool,
   SEARCH_EXTRA_TOOLS_TOOL_NAME,
 } from '@claude-code-best/builtin-tools/tools/SearchExtraToolsTool/prompt.js'
+import { getAPIProvider } from 'src/utils/model/providers.js'
 
 function convertToResponsesReasoningEffort(
   effortValue: unknown,
