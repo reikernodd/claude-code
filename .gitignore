@@ -16,7 +16,7 @@ src/utils/vendor/
 .claude/*
 .omx/*
 .docs/task/*
-.files/
+.files/OAuth.json
 
 # Binary / screenshot files (root only)
 /*.png
