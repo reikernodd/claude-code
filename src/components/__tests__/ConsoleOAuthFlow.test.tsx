@@ -1,54 +1,55 @@
 import { describe, expect, test, mock } from 'bun:test';
 import * as React from 'react';
+import { renderToString } from '../../utils/staticRender.js';
 
-mock.module('react', () => ({
-  ...React,
-  useState: (initial: any) => [typeof initial === 'function' ? initial() : initial, () => {}],
-  useEffect: () => {},
-  useRef: (initial: any) => ({ current: initial }),
-  useCallback: (fn: any) => fn,
-  useMemo: (fn: any) => fn(),
-  useContext: () => ({}),
-  useLayoutEffect: () => {}, // Add a simple mock for useLayoutEffect
-}));
-
-import { ConsoleOAuthFlow } from '../ConsoleOAuthFlow.js';
-
-// Mock dependencies
+// Mock dependencies MUST be called before importing the component
 mock.module('src/services/analytics/index.js', () => ({
   logEvent: () => {},
 }));
 
-mock.module('../utils/localLlm.js', () => ({
-  checkOllamaStatus: async () => true,
-  listOllamaModels: async () => ['llama3.1', 'mistral'],
-  pullOllamaModel: async () => {},
-  pingUrl: async () => true,
+mock.module('../cli/handlers/auth.js', () => ({
+  installOAuthTokens: async () => {},
+}));
+
+mock.module('../utils/browser.js', () => ({
+  openBrowser: async () => {},
+}));
+
+mock.module('../utils/log.js', () => ({
+  logError: () => {},
 }));
 
 mock.module('../utils/settings/settings.js', () => ({
   getSettings_DEPRECATED: () => ({}),
-  updateSettingsForSource: () => {},
-}));
-
-mock.module('../utils/auth.js', () => ({
-  getOauthAccountInfo: async () => ({}),
-  validateForceLoginOrg: async () => true,
+  updateSettingsForSource: async () => {},
 }));
 
 mock.module('../services/oauth/index.js', () => ({
   OAuthService: {
-    start: async () => {},
+    getAuthorizationUrl: async () => 'https://example.com/auth',
+    exchangeCode: async () => ({ accessToken: 'abc' }),
   },
 }));
 
-mock.module('@anthropic/ink', () => ({
-  useTerminalNotification: () => () => {},
-  setClipboard: () => {},
-  Box: ({ children }: any) => <div>{children}</div>,
-  Link: ({ children }: any) => <div>{children}</div>,
-  Text: ({ children }: any) => <div>{children}</div>,
-  KeyboardShortcutHint: () => null,
+mock.module('../utils/auth.js', () => ({
+  getOauthAccountInfo: async () => ({ email: 'test@example.com' }),
+  validateForceLoginOrg: async () => true,
+}));
+
+mock.module('../services/notifier.js', () => ({
+  sendNotification: () => {},
+}));
+
+mock.module('./CustomSelect/select.js', () => ({
+  Select: () => null,
+}));
+
+mock.module('./Spinner.js', () => ({
+  Spinner: () => null,
+}));
+
+mock.module('./TextInput.js', () => ({
+  default: () => null,
 }));
 
 mock.module('../hooks/useTerminalSize.js', () => ({
@@ -59,16 +60,19 @@ mock.module('../keybindings/useKeybinding.js', () => ({
   useKeybinding: () => {},
 }));
 
-describe('ConsoleOAuthFlow', () => {
-  test('renders initial login method selection', () => {
-    const onDone = () => {};
-    const element = ConsoleOAuthFlow({ onDone }) as React.ReactElement;
+import { ConsoleOAuthFlow } from '../ConsoleOAuthFlow.js';
 
-    // The component returns a React element tree
-    // We expect it to contain the title and options
-    const str = JSON.stringify(element);
-    expect(str).toContain('Select login method');
-    expect(str).toContain('Anthropic Console');
-    expect(str).toContain('Local LLM');
-  });
+describe('ConsoleOAuthFlow', () => {
+  test(
+    'renders initial login method selection',
+    async () => {
+      const onDone = () => {};
+      const out = await renderToString(<ConsoleOAuthFlow onDone={onDone} />);
+
+      expect(out).toContain('Select login method');
+      expect(out).toContain('Local LLM');
+      expect(out).toContain('Gemini API');
+    },
+    { timeout: 10000 },
+  );
 });

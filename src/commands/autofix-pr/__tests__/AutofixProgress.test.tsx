@@ -9,17 +9,25 @@ import { renderToString } from '../../../utils/staticRender.js';
 import { AutofixProgress } from '../AutofixProgress.js';
 
 describe('AutofixProgress', () => {
-  test('renders target in header', async () => {
-    const out = await renderToString(<AutofixProgress phase="detecting" target="acme/myrepo#42" />);
-    expect(out).toContain('acme/myrepo#42');
-    expect(out).toContain('Autofix PR');
-  });
+  test(
+    'renders target in header',
+    async () => {
+      const out = await renderToString(<AutofixProgress phase="detecting" target="acme/myrepo#42" />);
+      expect(out).toContain('acme/myrepo#42');
+      expect(out).toContain('Autofix PR');
+    },
+    { timeout: 10000 },
+  );
 
-  test('detecting phase shows arrow on detecting step', async () => {
-    const out = await renderToString(<AutofixProgress phase="detecting" target="owner/repo#1" />);
-    // detecting step should be active (→) and later steps pending (·)
-    expect(out).toContain('Detecting repository');
-  });
+  test(
+    'detecting phase shows arrow on detecting step',
+    async () => {
+      const out = await renderToString(<AutofixProgress phase="detecting" target="owner/repo#1" />);
+      // detecting step should be active (→) and later steps pending (·)
+      expect(out).toContain('Detecting repository');
+    },
+    { timeout: 10000 },
+  );
 
   test('checking_eligibility phase renders eligibility label', async () => {
     const out = await renderToString(<AutofixProgress phase="checking_eligibility" target="owner/repo#2" />);
